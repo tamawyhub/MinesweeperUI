@@ -192,6 +192,8 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.currentLabel.setObjectName("currentLabel")
         self.legendFormLayout.setWidget(4, QtWidgets.QFormLayout.FieldRole, self.currentLabel)
         self.verticalLayout.addLayout(self.legendFormLayout)
+        self.compassWidget = CompassWidget()
+        self.verticalLayout.addWidget(self.compassWidget)
         self.toolkitVerticalLayout = QtWidgets.QVBoxLayout()
         self.toolkitVerticalLayout.setSizeConstraint(QtWidgets.QLayout.SetMinimumSize)
         self.toolkitVerticalLayout.setContentsMargins(-1, -1, -1, 0)
@@ -425,6 +427,104 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         else:
             self.startStopStreamingButton.setText("Start Streaming")
             self.cameraFrame.setEnabled(False)
+
+class CompassWidget(QtWidgets.QWidget):
+    angleChanged = QtCore.pyqtSignal(float)
+    
+    def __init__(self, parent = None):
+    
+        super(QtWidgets.QWidget, self).__init__(parent)
+        
+        self._angle = 0.0
+        self._margins = 10
+        self._pointText = {0: "N", 45: "NE", 90: "E", 135: "SE", 180: "S",
+                           225: "SW", 270: "W", 315: "NW"}
+    
+    def paintEvent(self, event):
+    
+        painter = QtGui.QPainter()
+        painter.begin(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        
+        painter.fillRect(event.rect(), self.palette().brush(QtGui.QPalette.Window))
+        self.drawMarkings(painter)
+        self.drawNeedle(painter)
+        
+        painter.end()
+    
+    def drawMarkings(self, painter):
+    
+        painter.save()
+        painter.translate(self.width()/2, self.height()/2)
+        scale = min((self.width() - self._margins)/120.0,
+                    (self.height() - self._margins)/120.0)
+        painter.scale(scale, scale)
+        
+        font = QtGui.QFont(self.font())
+        font.setPixelSize(10)
+        metrics = QtGui.QFontMetricsF(font)
+        
+        painter.setFont(font)
+        painter.setPen(self.palette().color(QtGui.QPalette.Shadow))
+        
+        i = 0
+        while i < 360:
+        
+            if i % 45 == 0:
+                painter.drawLine(0, -40, 0, -50)
+                painter.drawText(-metrics.width(self._pointText[i])/2.0, -52,
+                                 self._pointText[i])
+            else:
+                painter.drawLine(0, -45, 0, -50)
+            
+            painter.rotate(15)
+            i += 15
+        
+        painter.restore()
+    
+    def drawNeedle(self, painter):
+    
+        painter.save()
+        painter.translate(self.width()/2, self.height()/2)
+        painter.rotate(self._angle)
+        scale = min((self.width() - self._margins)/120.0,
+                    (self.height() - self._margins)/120.0)
+        painter.scale(scale, scale)
+        
+        painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
+        painter.setBrush(self.palette().brush(QtGui.QPalette.Shadow))
+        
+        painter.drawPolygon(
+            QtGui.QPolygon([QtCore.QPoint(-10, 0), QtCore.QPoint(0, -45), QtCore.QPoint(10, 0),
+                      QtCore.QPoint(0, 45), QtCore.QPoint(-10, 0)])
+            )
+        
+        painter.setBrush(self.palette().brush(QtGui.QPalette.Highlight))
+        
+        painter.drawPolygon(
+            QtGui.QPolygon([QtCore.QPoint(-5, -25), QtCore.QPoint(0, -45), QtCore.QPoint(5, -25),
+                      QtCore.QPoint(0, -30), QtCore.QPoint(-5, -25)])
+            )
+        
+        painter.restore()
+    
+    def sizeHint(self):
+    
+        return QtCore.QSize(150, 150)
+    
+    def angle(self):
+        return self._angle
+    
+    @QtCore.pyqtSlot(float)
+    def setAngle(self, angle):
+    
+        if angle != self._angle:
+            self._angle = angle
+            self.angleChanged.emit(angle)
+            self.update()
+    
+    angle = QtCore.pyqtProperty(float, angle, setAngle)
+
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
